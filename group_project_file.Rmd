@@ -17,6 +17,7 @@ library(lubridate)
 library(tsibble)
 library(fpp3)
 library(forecast)
+library(dplyr)
 
 nrow <- nrow(credit_data)
 
@@ -33,21 +34,107 @@ colnames(credit_data)[1] <- "Credit"
 colnames(credit_data)[2] <- "Date"
 
 
-train <- head(credit_data, nrow(credit_data)-12)
-
 ```
 
 
-
-```{r Models}
+```{r}
 #Exponential Smoothing?
-fit <- ses(train$Credit[1:40], h=40, alpha=.5, initial="simple")
+fit <- ses(TRAIN$Credit[1:40], h=40, alpha=.5, initial="simple")
 summary(fit)
 
 autoplot(fit)
 
+```
 
+Use box cox for NN
+```{r}
+lambda <- credit_data %>% 
+  features(Credit, features = guerrero) %>% 
+  pull(lambda_guerrero)
+
+credit_data <- credit_data%>%
+  mutate(bc_credit = box_cox(Credit, lambda))
 
 
 ```
+
+
+Train and Holdout Data
+```{r}
+TRAIN <- head(credit_data, nrow(credit_data)*0.8)
+HOLDOUT <- tail(credit_data, nrow(credit_data)*0.2)
+```
+
+
+Linear Model
+```{r}
+LinearFit <- TRAIN%>%
+  model(TSLM(Credit~trend()))
+
+report(LinearFit)
+
+```
+
+RMSE function
+```{r}
+rmse <- function(y_pred, y_actual) {
+  sqrt(mean((y_pred - y_actual)^2))
+}
+
+```
+
+
+Forecast and Predict Linear Model
+```{r}
+LinearFit%>%
+  forecast(HOLDOUT)%>%
+  autoplot(TRAIN)
+
+bc_pred <- LinearFit %>% 
+  forecast(HOLDOUT)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+NextYearPred <- pred
+
+#Uncomment to write preds to csv if left uncommented we would have a lot of csv's
+#LogicalPredictions <- write_csv(NextYearPred, "LogicalPredictions.csv")
+
+rmse <- function(y_pred, y_actual) {
+  sqrt(mean((y_pred - y_actual)^2))
+}
+
+```
+
+
+Model NN
+```{r}
+fit <- TRAIN%>%
+  model(NNETAR(bc_credit))
+
+glance(fit)
+gg_tsresiduals(fit)
+```
+
+
+Forecast and Predict NN
+```{r}
+fit%>%
+  forecast(HOLDOUT, times = 50)%>%
+  autoplot(TRAIN)
+
+bc_pred <- fit %>% 
+  forecast(HOLDOUT, times = 12)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+NextYearPred <- pred
+
+#Uncomment to write preds to csv if left uncommented we would have a lot of csv's
+#NNpredictions <- write.csv(NextYearPred, "NNPredictions.csv")
+
+rmse(NextYearPred[1:12], HOLDOUT$Credit[1:12])
+
+
+```
+
+
 
