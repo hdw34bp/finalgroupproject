@@ -53,9 +53,6 @@ credits <- credits%>%
   as_tsibble(index = date)
 
 
-TRAIN <- head(credits, nrow(credits)-12)
-HOLDOUT <- tail(credits, 12)
-
 ```
 
 
@@ -87,28 +84,23 @@ predict(fit)
 
 
 
-Change to tsibble and use box cox for NN
+Use box cox for NN
 ```{r}
-credit <- read.csv("credit.csv")
-head(credit)
-credit$Index <- seq.int(nrow(credit))
-
-credit <- credit%>%
-  as_tsibble(index = Index)
-
-lambda <- credit %>% 
-  features(credit_in_millions, features = guerrero) %>% 
+lambda <- credits %>% 
+  features(credits_in_millions, features = guerrero) %>% 
   pull(lambda_guerrero)
 
-credit <- credit%>%
-  mutate(bc_credit = box_cox(credit_in_millions, lambda))
+credits <- credits%>%
+  mutate(bc_credit = box_cox(credits_in_millions, lambda))
 
 
 ```
+
+
 Train and Holdout Data
 ```{r}
-TRAIN <- head(credit, 393)
-HOLDOUT <- tail(credit, 97)
+TRAIN <- head(credits, nrow(credits)*0.8)
+HOLDOUT <- tail(credits, nrow(credits)*0.2)
 ```
 
 
@@ -124,17 +116,28 @@ report(LinearFit)
 
 ```
 
+RMSE function
+```{r}
+rmse <- function(y_pred, y_actual) {
+  sqrt(mean((y_pred - y_actual)^2))
+}
+
+```
+
+
+
+
 Forecast and Predict Linear Model
 ```{r}
 LinearFit%>%
-  forecast(HOLDOUT, h=12)%>%
+  forecast(HOLDOUT)%>%
   autoplot(TRAIN)
 
 bc_pred <- LinearFit %>% 
   forecast(HOLDOUT)
 
 pred <- inv_box_cox(bc_pred$.mean, lambda)
-NextYearPred <- pred[1:12]
+NextYearPred <- pred
 
 #Uncomment to write preds to csv if left uncommented we would have a lot of csv's
 #LogicalPredictions <- write_csv(NextYearPred, "LogicalPredictions.csv")
@@ -142,7 +145,7 @@ NextYearPred <- pred[1:12]
 rmse <- function(y_pred, y_actual) {
   sqrt(mean((y_pred - y_actual)^2))
 }
-rmse(NextYearPred, HOLDOUT$credit_in_millions[1:12])
+rmse(NextYearPred, HOLDOUT$credits_in_millions)
 
 ```
 
@@ -160,19 +163,19 @@ gg_tsresiduals(fit)
 Forecast and Predict NN
 ```{r}
 fit%>%
-  forecast(HOLDOUT, times = 12)%>%
+  forecast(HOLDOUT, times = 50)%>%
   autoplot(TRAIN)
 
 bc_pred <- fit %>% 
-  forecast(HOLDOUT, times = 50)
+  forecast(HOLDOUT, times = 12)
 
 pred <- inv_box_cox(bc_pred$.mean, lambda)
-NextYearPred <- pred[1:12]
+NextYearPred <- pred
 
 #Uncomment to write preds to csv if left uncommented we would have a lot of csv's
 #NNpredictions <- write.csv(NextYearPred, "NNPredictions.csv")
 
-rmse(NextYearPred, HOLDOUT$credit_in_millions[1:12])
+rmse(NextYearPred[1:12], HOLDOUT$credits_in_millions[1:12])
 
 
 ```
