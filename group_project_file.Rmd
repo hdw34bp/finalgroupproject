@@ -53,6 +53,9 @@ credits <- credits%>%
   as_tsibble(index = date)
 
 
+TRAIN <- head(credits, nrow(credits)-12)
+HOLDOUT <- tail(credits, 12)
+
 ```
 
 
