@@ -35,6 +35,22 @@ colnames(credit_data)[2] <- "Date"
 
 
 train <- head(credit_data, nrow(credit_data)-12)
+holdout <- tail(credit_data, 12)
+
+credit_data <- credit_data%>%
+  as_tsibble(index = Date)
+
+
+
+plot(credit_data$Date, credit_data$Credit)
+
+
+#Make new df to turn into tsibble
+credits <- data.frame(date = seq(yearmonth("1982-01"),yearmonth("2022-12"),by=1))
+credits$credits_in_millions <- credit_data$Credit
+
+credits <- credits%>%
+  as_tsibble(index = date)
 
 
 ```
@@ -55,6 +71,19 @@ autoplot(fit)
 
 ```
 
+ETS Predictions
+```{r}
+pred <- predict(fit, holdout)
+
+predict(fit)
+
+
+```
+
+
+
+
+
 Change to tsibble and use box cox for NN
 ```{r}
 credit <- read.csv("credit.csv")
@@ -70,6 +99,7 @@ lambda <- credit %>%
 
 credit <- credit%>%
   mutate(bc_credit = box_cox(credit_in_millions, lambda))
+
 
 ```
 Train and Holdout Data
