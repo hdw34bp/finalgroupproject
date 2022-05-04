@@ -16,7 +16,8 @@ credit_data <- read.csv("credit.csv")
 library(lubridate)
 library(tsibble)
 library(fpp3)
-
+install.packages("forecast")
+library(forecast)
 year <- c()
 
 for (i in 1:41) {
@@ -42,5 +43,15 @@ train <- head(credit_data, nrow(credit_data)-12)
 
 ```{r Plots, echo=FALSE}
 plot(pressure)
+```
+
+
+```{r}
+#Exponential Smoothing?
+fit <- ses(train$Credit[1:40], h=40, alpha=.5, initial="simple")
+summary(fit)
+
+autoplot(fit)
+
 ```
 
