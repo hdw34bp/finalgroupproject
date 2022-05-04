@@ -12,28 +12,19 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r Credit Data Cleaning}
 credit_data <- read.csv("credit.csv")
-
 library(lubridate)
 library(tsibble)
 library(fpp3)
 library(forecast)
 library(dplyr)
-
 nrow <- nrow(credit_data)
-
 credit_data$date <- yearmonth(nrow:1)
-
 credit_data$date
-
 credit_data <- tsibble(credit_data, index = date)
-
 #check
 autoplot(credit_data)
-
 colnames(credit_data)[1] <- "Credit"
 colnames(credit_data)[2] <- "Date"
-
-
 ```
 
 
@@ -41,9 +32,7 @@ colnames(credit_data)[2] <- "Date"
 #Exponential Smoothing?
 fit <- ses(TRAIN$Credit[1:40], h=40, alpha=.5, initial="simple")
 summary(fit)
-
 autoplot(fit)
-
 ```
 
 Use box cox for NN
@@ -51,11 +40,8 @@ Use box cox for NN
 lambda <- credit_data %>% 
   features(Credit, features = guerrero) %>% 
   pull(lambda_guerrero)
-
 credit_data <- credit_data%>%
   mutate(bc_credit = box_cox(Credit, lambda))
-
-
 ```
 
 
@@ -70,9 +56,7 @@ Linear Model
 ```{r}
 LinearFit <- TRAIN%>%
   model(TSLM(Credit~trend()))
-
 report(LinearFit)
-
 ```
 
 RMSE function
@@ -80,7 +64,6 @@ RMSE function
 rmse <- function(y_pred, y_actual) {
   sqrt(mean((y_pred - y_actual)^2))
 }
-
 ```
 
 
@@ -89,20 +72,15 @@ Forecast and Predict Linear Model
 LinearFit%>%
   forecast(HOLDOUT)%>%
   autoplot(TRAIN)
-
 bc_pred <- LinearFit %>% 
   forecast(HOLDOUT)
-
 pred <- inv_box_cox(bc_pred$.mean, lambda)
 NextYearPred <- pred
-
 #Uncomment to write preds to csv if left uncommented we would have a lot of csv's
 #LogicalPredictions <- write_csv(NextYearPred, "LogicalPredictions.csv")
-
 rmse <- function(y_pred, y_actual) {
   sqrt(mean((y_pred - y_actual)^2))
 }
-
 ```
 
 
@@ -110,7 +88,6 @@ Model NN
 ```{r}
 fit <- TRAIN%>%
   model(NNETAR(bc_credit))
-
 glance(fit)
 gg_tsresiduals(fit)
 ```
@@ -121,20 +98,29 @@ Forecast and Predict NN
 fit%>%
   forecast(HOLDOUT, times = 50)%>%
   autoplot(TRAIN)
-
 bc_pred <- fit %>% 
   forecast(HOLDOUT, times = 12)
-
 pred <- inv_box_cox(bc_pred$.mean, lambda)
 NextYearPred <- pred
-
 #Uncomment to write preds to csv if left uncommented we would have a lot of csv's
 #NNpredictions <- write.csv(NextYearPred, "NNPredictions.csv")
-
 rmse(NextYearPred[1:12], HOLDOUT$Credit[1:12])
-
-
 ```
 
 
+ARIMA Forecast and Predictions
+```{r}
+fit%>%
+  forecast(credit_data, h=12)%>%
+  autoplot(TRAIN)
 
+bc_pred <- fit%>%
+  forecast(HOLDOUT)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+NextYearPred <- pred[1:12]
+
+rmse(NextYearPred, HOLDOUT$Credit[1:12])
+
+#write.csv(NextYearPred, "ARIMA_Predictions.csv")
+```
