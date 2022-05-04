@@ -1,0 +1,57 @@
+---
+title: "group_project_file"
+author: "Griffin Thurman"
+date: "5/3/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r Credit Data Cleaning}
+credit_data <- read.csv("credit.csv")
+
+library(lubridate)
+library(tsibble)
+library(fpp3)
+install.packages("forecast")
+library(forecast)
+year <- c()
+
+for (i in 1:41) {
+  year[i] <- 1980 + i
+}
+
+year <- rep(year, 12)
+year <- year[order(year, decreasing = TRUE)]
+
+credit_data$date <- paste(year, credit_data$date)
+credit_data$date <- yearmonth
+
+colnames(credit_data)[1] <- "Credit"
+colnames(credit_data)[2] <- "Date"
+
+
+train <- head(credit_data, nrow(credit_data)-12)
+
+
+```
+
+
+
+```{r Plots, echo=FALSE}
+plot(pressure)
+```
+
+
+```{r}
+#Exponential Smoothing?
+fit <- ses(train$Credit[1:40], h=40, alpha=.5, initial="simple")
+summary(fit)
+
+autoplot(fit)
+
+```
+
