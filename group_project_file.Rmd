@@ -16,7 +16,7 @@ credit_data <- read.csv("credit.csv")
 library(lubridate)
 library(tsibble)
 library(fpp3)
-install.packages("forecast")
+#install.packages("forecast")
 library(forecast)
 year <- c()
 
@@ -28,7 +28,7 @@ year <- rep(year, 12)
 year <- year[order(year, decreasing = TRUE)]
 
 credit_data$date <- paste(year, credit_data$date)
-credit_data$date <- yearmonth
+credit_data$date <- yearmonth(credit_data$date)
 
 colnames(credit_data)[1] <- "Credit"
 colnames(credit_data)[2] <- "Date"
@@ -54,4 +54,97 @@ summary(fit)
 autoplot(fit)
 
 ```
+
+Change to tsibble and use box cox for NN
+```{r}
+credit <- read.csv("credit.csv")
+head(credit)
+credit$Index <- seq.int(nrow(credit))
+
+credit <- credit%>%
+  as_tsibble(index = Index)
+
+lambda <- credit %>% 
+  features(credit_in_millions, features = guerrero) %>% 
+  pull(lambda_guerrero)
+
+credit <- credit%>%
+  mutate(bc_credit = box_cox(credit_in_millions, lambda))
+
+```
+Train and Holdout Data
+```{r}
+TRAIN <- head(credit, 393)
+HOLDOUT <- tail(credit, 97)
+```
+
+
+
+
+
+Linear Model
+```{r}
+LinearFit <- TRAIN%>%
+  model(TSLM(bc_credit~trend()))
+
+report(LinearFit)
+
+```
+
+Forecast and Predict Linear Model
+```{r}
+LinearFit%>%
+  forecast(HOLDOUT, h=12)%>%
+  autoplot(TRAIN)
+
+bc_pred <- LinearFit %>% 
+  forecast(HOLDOUT)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+NextYearPred <- pred[1:12]
+
+#Uncomment to write preds to csv if left uncommented we would have a lot of csv's
+#LogicalPredictions <- write_csv(NextYearPred, "LogicalPredictions.csv")
+
+rmse <- function(y_pred, y_actual) {
+  sqrt(mean((y_pred - y_actual)^2))
+}
+rmse(NextYearPred, HOLDOUT$credit_in_millions[1:12])
+
+```
+
+
+Model NN
+```{r}
+fit <- TRAIN%>%
+  model(NNETAR(bc_credit))
+
+glance(fit)
+gg_tsresiduals(fit)
+```
+
+
+Forecast and Predict NN
+```{r}
+fit%>%
+  forecast(HOLDOUT, times = 12)%>%
+  autoplot(TRAIN)
+
+bc_pred <- fit %>% 
+  forecast(HOLDOUT, times = 50)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+NextYearPred <- pred[1:12]
+
+#Uncomment to write preds to csv if left uncommented we would have a lot of csv's
+#NNpredictions <- write.csv(NextYearPred, "NNPredictions.csv")
+
+rmse(NextYearPred, HOLDOUT$credit_in_millions[1:12])
+
+
+```
+
+
+
+
 

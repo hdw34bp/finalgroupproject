@@ -1,0 +1,107 @@
+---
+title: "BAS 475 Final Model"
+author: "Hunter Weimar"
+date: "5/2/2022"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(fpp3)
+library(regclass)
+library(forecast)
+library(tseries)
+library(tidyverse)
+```
+
+
+Add row numbers and transform
+```{r data}
+credit <- read.csv("credit.csv")
+head(credit)
+credit$Index <- seq.int(nrow(credit))
+
+credit <- credit%>%
+  as_tsibble(index = Index)
+
+lambda <- credit %>% 
+  features(credit_in_millions, features = guerrero) %>% 
+  pull(lambda_guerrero)
+
+credit <- credit%>%
+  mutate(bc_credit = box_cox(credit_in_millions, lambda))
+
+```
+
+
+Train Test Split
+```{r pressure, echo=FALSE}
+TRAIN <- head(credit, 393)
+nrow(TRAIN)
+HOLDOUT <- tail(credit, 97)
+nrow(HOLDOUT)
+nrow(credit)
+```
+
+Fit Neural Network
+```{r}
+fit <- TRAIN%>%
+  model(NNETAR(bc_credit))
+
+report(fit)
+gg_tsresiduals(fit)
+```
+
+Forecast NN
+```{r}
+fit%>%
+  forecast(HOLDOUT, times = 100)%>%
+  autoplot(HOLDOUT)
+
+```
+
+
+Try Linear
+```{r}
+LinearFit <- TRAIN%>%
+  model(TSLM(bc_credit~trend()))
+
+report(LinearFit)
+
+
+```
+
+
+Forecast Linear Model
+```{r}
+LinearFit%>%
+  forecast(HOLDOUT)%>%
+  autoplot(HOLDOUT)
+
+```
+
+Predict Linear Model
+```{r}
+bc_pred <- LinearFit %>% 
+  forecast(HOLDOUT)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+#pred
+
+rmse <- function(y_pred, y_actual) {
+  sqrt(mean((y_pred - y_actual)^2))
+}
+rmse(pred, HOLDOUT$credit_in_millions)
+```
+
+
+NN Predict
+```{r}
+bc_pred <- fit %>% 
+  forecast(HOLDOUT, times = 50)
+
+pred <- inv_box_cox(bc_pred$.mean, lambda)
+
+rmse(pred, HOLDOUT$credit_in_millions)
+```
+
